@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const dns = require('dns');
 const app = express();
 
 const port = process.env.PORT || 3003;
@@ -24,29 +25,35 @@ app.use(express.urlencoded({
 const originalURLs = [];
 
 app.post('/api/shorturl', (req, res) => {
-  const url = req.body.url;
+  let originalUrl = req.body.url;
 
-  // Improved URL validation regex
-  const urlPattern = /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/;
-  
-  if (!urlPattern.test(url)) {
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(originalUrl);
+  } catch (err) {
     return res.json({ error: 'invalid url' });
   }
 
-  const foundIndex = originalURLs.indexOf(url);
+  dns.lookup(parsedUrl.hostname, (err) => {
+    if (err) {
+      return res.json({ error: 'invalid url' });
+    }
 
-  if (foundIndex < 0) {
-    originalURLs.push(url);
-    const shortId = originalURLs.length; 
+    const foundIndex = originalURLs.indexOf(originalUrl);
+
+    if (foundIndex < 0) {
+      originalURLs.push(originalUrl);
+      const shortId = originalURLs.length;
+      return res.json({
+        original_url: originalUrl,
+        short_url: shortId
+      });
+    }
+
     return res.json({
-      original_url: url,
-      short_url: shortId
+      original_url: originalUrl,
+      short_url: foundIndex + 1
     });
-  }
-
-  return res.json({
-    original_url: url,
-    short_url: foundIndex + 1
   });
 });
 
